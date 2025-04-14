@@ -4,214 +4,179 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
-import okhttp3.*
-import org.json.JSONObject
-import java.io.IOException
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.compose.foundation.clickable
+import com.telehub.telehubapp.network.ApiClient
+import com.telehub.telehubapp.player.playerManager
+import androidx.activity.viewModels
+import com.telehub.telehubapp.viewmodels.MainViewModel
+import androidx.media3.common.util.UnstableApi
 
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
+    private lateinit var client: ApiClient
+    private lateinit var playerManager: playerManager
     private lateinit var player: ExoPlayer
+    private val mac = "00:1A:79:00:00:01"
+    private val url = "http://test.eurolan.net/stalker_portal/server/load.php"
+    private val referer = "http://test.eurolan.net/stalker_portal/c/"
+    private val viewModel by viewModels<MainViewModel>()
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         player = ExoPlayer.Builder(this).build()
+        client = ApiClient(mac, url, referer)
+        playerManager = playerManager(this, mac, referer)
 
         setContent {
+            val genres: List<String> by remember { derivedStateOf { viewModel.extractGenresFromChannels() } }
+
             MaterialTheme {
-                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                    Text("TeleHub", style = MaterialTheme.typography.headlineMedium)
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Button(onClick = { loginAndPlay() }) {
-                        Text("Login & Play")
+                Scaffold(
+                    topBar = {
+                        CenterAlignedTopAppBar(
+                            title = { Text("📺 TeleHub IPTV", style = MaterialTheme.typography.titleLarge) }
+                        )
+                    }
+                ) { innerPadding ->
+                    Row(
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .fillMaxSize()
+                    ) {
+                        // 📁 Genres
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(8.dp)
+                        ) {
+                            item {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .clickable { viewModel.selectGenre(null) },
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                                ) {
+                                    Box(modifier = Modifier.padding(12.dp)) {
+                                        Text("❌ Clear Filter", style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                }
+                            }
+
+                            items(genres) { genre ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .clickable {
+                                            viewModel.selectGenre(genre)
+                                        },
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Box(modifier = Modifier.padding(12.dp)) {
+                                        Text(genre, style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                }
+                            }
+                        }
+
+                        // 📺 Channels
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(2f)
+                                .fillMaxHeight()
+                                .padding(8.dp)
+                        ) {
+                            items(viewModel.filteredChannels) { channel ->
+                                val name = channel.first        // or channel.component1()
+                                val cmd = channel.second        // or channel.component2()
+                                ChannelCard(name = name) {
+                                    client.createLink(viewModel.token, cmd) { streamUrl ->
+                                        playerManager.play(streamUrl)
+                                        setContentView(playerManager.getPlayerView())
+                                    }
+
+                                }
+                            }
+                        }
+
+                        // 🕒 EPG
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(2f)
+                                .fillMaxHeight()
+                                .padding(8.dp)
+                        ) {
+                            item {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { /* TODO: Show more info, maybe future recording? */ },
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text("Now Playing", style = MaterialTheme.typography.titleMedium)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text("12:00 - News Hour")
+                                        Text("12:30 - Tech Show")
+                                        Text("13:00 - Movie Time")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+            }
+
+        }
+
+
+
+        client.login(
+            onSuccess = { token ->
+                viewModel.updateToken(token)
+                client.getProfile(token) {
+                    client.getAllChannels(token) { list ->
+                        runOnUiThread {
+                            viewModel.updateChannels(list)
+                        }
+                    }
+                }
+            },
+            onFailure = { error -> println("Login error: $error") }
+        )
+
+    }
+
+    @Composable
+    fun ChannelCard(name: String, onClick: () -> Unit) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .clickable { onClick() },
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Box(modifier = Modifier.padding(12.dp)) {
+                Text(name, style = MaterialTheme.typography.bodyLarge)
             }
         }
     }
 
-    private fun loginAndPlay() {
-        val mac = "00:1A:79:00:00:01"
-        val client = OkHttpClient()
-
-        val url = "http://test.eurolan.net/stalker_portal/server/load.php"
-
-        val body = FormBody.Builder()
-            .add("type", "stb")
-            .add("action", "handshake")
-            .add("token", "")
-            .add("JsHttpRequest", "1-xml")
-            .build()
-
-        val request = Request.Builder()
-            .url(url)
-            .post(body)
-            .addHeader("User-Agent", "Mozilla/5.0 (QtEmbedded; U; Linux; C)")
-            .addHeader("Authorization", "Bearer null")
-            .addHeader("X-User-Agent", "Model: MAG254; Link: Ethernet")
-            .addHeader("Referer", "http://test.eurolan.net/stalker_portal/c/")
-            .addHeader("Cookie", "mac=$mac; stb_lang=en; timezone=Europe/Sofia")
-            .addHeader("Accept", "*/*")
-            .build()
-
-        println("➡️ Sending handshake request...")
-        lifecycleScope.launch {
-            client.newCall(request).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    e.printStackTrace()
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    val bodyStr = response.body?.string() ?: ""
-                    println("RAW RESPONSE: $bodyStr")
-
-                    try {
-                        val json = JSONObject(bodyStr)
-                        val token = json.getJSONObject("js").getString("token")
-                        println("TOKEN: $token")
-
-                        // ➕ Now call get_profile
-                        getProfile(token)
-
-                    } catch (e: Exception) {
-                        println("JSON ERROR: ${e.message}")
-                    }
-                }
-
-
-            })
-        }
-    }
-
-    private fun getProfile(token: String) {
-        val mac = "00:1A:79:00:00:01"
-        val client = OkHttpClient()
-
-        val url = "http://test.eurolan.net/stalker_portal/server/load.php"
-
-        val body = FormBody.Builder()
-            .add("type", "stb")
-            .add("action", "get_profile")
-            .add("hd", "1")
-            .add("JsHttpRequest", "1-xml")
-            .add("hw_version", "1.7-BD-00")
-            .add("ver", "ImageDescription: 21842")
-            .add("serial_number", "STB0000001")
-            .build()
-
-        val request = Request.Builder()
-            .url(url)
-            .post(body)
-            .addHeader("User-Agent", "Mozilla/5.0 (QtEmbedded; U; Linux; C)")
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("X-User-Agent", "Model: MAG254; Link: Ethernet")
-            .addHeader("Referer", "http://test.eurolan.net/stalker_portal/c/")
-            .addHeader("Cookie", "mac=$mac; stb_lang=en; timezone=Europe/Sofia")
-            .addHeader("Accept", "*/*")
-            .build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                println("❌ get_profile failed: ${e.message}")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                val profileStr = response.body?.string() ?: ""
-                println("👤 PROFILE: $profileStr")
-                getAllChannels(token)
-            }
-        })
-    }
-
-    private fun getAllChannels(token: String) {
-        val mac = "00:1A:79:00:00:01"
-        val client = OkHttpClient()
-
-        val url = "http://test.eurolan.net/stalker_portal/server/load.php"
-
-        val body = FormBody.Builder()
-            .add("type", "itv")
-            .add("action", "get_all_channels")
-            .add("JsHttpRequest", "1-xml")
-            .build()
-
-        val request = Request.Builder()
-            .url(url)
-            .post(body)
-            .addHeader("User-Agent", "Mozilla/5.0 (QtEmbedded; U; Linux; C)")
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("X-User-Agent", "Model: MAG254; Link: Ethernet")
-            .addHeader("Referer", "http://test.eurolan.net/stalker_portal/c/")
-            .addHeader("Cookie", "mac=$mac; stb_lang=en; timezone=Europe/Sofia")
-            .addHeader("Accept", "*/*")
-            .build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                println("❌ get_all_channels failed: ${e.message}")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                val channelsStr = response.body?.string() ?: ""
-                println("📺 CHANNELS: $channelsStr")
-                createLink(token, "ffrt http:///ch/97")
-
-            }
-        })
-
-    }
-
-    private fun createLink(token: String, cmd: String) {
-        val mac = "00:1A:79:00:00:01"
-        val url = "http://test.eurolan.net/stalker_portal/server/load.php"
-
-        val body = FormBody.Builder()
-            .add("type", "itv")
-            .add("action", "create_link")
-            .add("cmd", cmd)
-            .add("series", "0")
-            .add("forced_storage", "undefined")
-            .add("disable_ad", "0")
-            .add("JsHttpRequest", "1-xml")
-            .build()
-
-        val request = Request.Builder()
-            .url(url)
-            .post(body)
-            .addHeader("User-Agent", "Mozilla/5.0 (QtEmbedded; U; Linux; C)")
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("X-User-Agent", "Model: MAG254; Link: Ethernet")
-            .addHeader("Referer", "http://test.eurolan.net/stalker_portal/c/")
-            .addHeader("Cookie", "mac=$mac; stb_lang=en; timezone=Europe/Sofia")
-            .addHeader("Accept", "*/*")
-            .build()
-
-        OkHttpClient().newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                println("❌ create_link failed: ${e.message}")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                val result = response.body?.string()
-                println("🎥 STREAM LINK RESULT: $result")
-                val streamUrl = JSONObject(result).getJSONObject("js").getString("cmd")
-                println("🎬 FINAL STREAM: $streamUrl")
-                playStream(streamUrl)
-            }
-        })
-    }
-
+    @UnstableApi
     private fun playStream(url: String) {
         runOnUiThread {
             val dataSourceFactory = DefaultHttpDataSource.Factory()
@@ -220,9 +185,9 @@ class MainActivity : ComponentActivity() {
                 .setDefaultRequestProperties(
                     mapOf(
                         "User-Agent" to "Mozilla/5.0 (QtEmbedded; U; Linux; C)",
-                        "Referer" to "http://test.eurolan.net/stalker_portal/c/",
-                        "Cookie" to "mac=00:1A:79:00:00:01; stb_lang=en; timezone=Europe/Sofia",
-                        "Accept-Encoding" to "identity"  // 👈 add this!
+                        "Referer" to referer,
+                        "Cookie" to "mac=$mac; stb_lang=en; timezone=Europe/Sofia",
+                        "Accept-Encoding" to "identity"
                     )
                 )
 
@@ -249,6 +214,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        player.release()
+        playerManager.release()
     }
 }
