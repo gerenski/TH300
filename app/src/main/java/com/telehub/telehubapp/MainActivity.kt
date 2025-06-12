@@ -112,8 +112,10 @@ class MainActivity : ComponentActivity() {
 
                                 ChannelCard(name = name) {
                                     client.createLink(viewModel.token, cmd) { streamUrl ->
-                                        playerManager.play(streamUrl)
-                                        setContentView(playerManager.getPlayerView())
+                                        runOnUiThread {
+                                            playerManager.play(streamUrl)
+                                            setContentView(playerManager.getPlayerView())
+                                        }
                                     }
 
                                 }
