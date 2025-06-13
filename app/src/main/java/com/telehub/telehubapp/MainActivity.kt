@@ -258,4 +258,6 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         playerManager.release()
     }
+
+}
 }
