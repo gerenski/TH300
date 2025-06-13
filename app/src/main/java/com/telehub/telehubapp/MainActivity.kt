@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.media3.common.MediaItem
@@ -45,6 +46,7 @@ class MainActivity : ComponentActivity() {
             val genres = viewModel.genres
             val dates = viewModel.availableDates
             val selectedDate = viewModel.selectedDate
+            val playerView = remember { playerManager.getPlayerView() }
 
             MaterialTheme {
                 Scaffold(
@@ -54,11 +56,21 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 ) { innerPadding ->
-                    Row(
+                    Column(
                         modifier = Modifier
                             .padding(innerPadding)
                             .fillMaxSize()
                     ) {
+                        AndroidView(
+                            factory = { playerView },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                        ) {
                         // 📁 Genres
                         LazyColumn(
                             modifier = Modifier
@@ -114,7 +126,6 @@ class MainActivity : ComponentActivity() {
                                     client.createLink(viewModel.token, cmd) { streamUrl ->
                                         runOnUiThread {
                                             playerManager.play(streamUrl)
-                                            setContentView(playerManager.getPlayerView())
                                         }
                                     }
 
@@ -248,8 +259,6 @@ class MainActivity : ComponentActivity() {
                 useController = true
                 this.player = player
             }
-
-            setContentView(playerView)
 
             player.setMediaSource(mediaSource)
             player.prepare()
