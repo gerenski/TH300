@@ -219,20 +219,6 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    @Composable
-    fun ChannelCard(name: String, onClick: () -> Unit) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 1.dp) //Vertical distance between cards
-                .clickable { onClick() },
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Box(modifier = Modifier.padding(9.dp)) {
-                Text(name, style = MaterialTheme.typography.bodyLarge)
-            }
-        }
-    }
 
     @UnstableApi
     private fun playStream(url: String) {
