@@ -1,30 +1,37 @@
 package com.telehub.thgo.ui
 
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.compose.foundation.clickable
+import androidx.media3.ui.PlayerView
 import com.telehub.thgo.network.ApiClient
 import com.telehub.thgo.player.playerManager
-import androidx.activity.viewModels
 import com.telehub.thgo.viewmodels.MainViewModel
-import androidx.media3.common.util.UnstableApi
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
 
+// ToDo
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     private lateinit var client: ApiClient
@@ -34,7 +41,7 @@ class MainActivity : ComponentActivity() {
     private val url = "http://test.eurolan.net/stalker_portal/server/load.php"
     private val referer = "http://test.eurolan.net/stalker_portal/c/"
     private val viewModel by viewModels<MainViewModel>()
-
+    // Removed: showControls field is no longer needed
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,181 +53,194 @@ class MainActivity : ComponentActivity() {
             val genres = viewModel.genres
             val dates = viewModel.availableDates
             val selectedDate = viewModel.selectedDate
-            val playerView = remember { playerManager.getPlayerView() }
+            val playerView = remember {
+                playerManager.getPlayerView().apply {
+                    useController = false
+                }
+            }
+            var controlsVisible by remember { mutableStateOf(true) }
+            val focusRequester = remember { FocusRequester() }
+
+// Request focus when controls become visible
+            LaunchedEffect(controlsVisible) {
+                if (controlsVisible) {
+                    focusRequester.requestFocus()
+                }
+            }
+            // No sync needed between showControls and controlsVisible anymore
 
             MaterialTheme {
                 Scaffold(
                     topBar = {
-                        CenterAlignedTopAppBar(
-                            title = {
-                                Text(
-                                    "📺 THGo IPTV",
-                                    style = MaterialTheme.typography.titleLarge
-                                )
-                            }
-                        )
+                        if (controlsVisible) {
+                            CenterAlignedTopAppBar(
+                                title = {
+                                    Text("\uD83D\uDCFA THGo IPTV", style = MaterialTheme.typography.titleLarge)
+                                }
+                            )
+                        }
                     }
                 ) { innerPadding ->
-                    Column(
+                    Box(
                         modifier = Modifier
-                            .padding(innerPadding)
                             .fillMaxSize()
+                            .focusRequester(focusRequester)
+                            .focusable()
+                            .onKeyEvent {
+                                if (it.type == KeyEventType.KeyDown &&
+                                    (it.key == Key.Enter || it.key == Key.DirectionCenter)
+                                ) {
+                                    controlsVisible = !controlsVisible
+                                    true
+                                } else {
+                                    false // Don't consume arrows
+                                }
+                            }
+                            .padding(innerPadding)
                     ) {
                         AndroidView(
-                            factory = { playerView },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                        ) {
-                            // 📁 Genres
-                            LazyColumn(
-                                modifier = Modifier
-                                    .weight(2f)
-                                    //.fillMaxHeight()
-                                    .heightIn(max = 200.dp) // or whatever height fits ~10 items
-                                    .padding(2.dp)//Space from left side of screen
-                            ) {
-                                items(genres) { genre ->
-                                    Card(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 1.dp)//Space between cards, vertical
-                                            .clickable {
-                                                viewModel.selectGenre(if (genre == "All") null else genre)
-                                            },
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                    ) {
-                                        Box(modifier = Modifier.padding(4.dp)) { //Vertical size of cards
-                                            Text(genre, style = MaterialTheme.typography.bodyMedium)
+                            factory = {
+                                playerView.apply {
+                                    setOnKeyListener { _, _, event ->
+                                        // Let ENTER/DPAD_CENTER events bubble up to Compose
+                                        if (event.keyCode == KeyEvent.KEYCODE_ENTER ||
+                                            event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+                                            false
+                                        } else {
+                                            true
                                         }
                                     }
                                 }
-                            }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
 
-                            // 📺 Channels
-                            LazyColumn(
+                        if (controlsVisible) {
+                            Column(
                                 modifier = Modifier
-                                    .weight(3f)
-                                    //.fillMaxHeight()
-                                    .heightIn(max = 452.dp) // or whatever height fits ~10 items
-                                    .padding(2.dp)
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f))
                             ) {
-                                items(viewModel.filteredChannels) { channel ->
-                                    val name = channel.name        // or channel.component1()
-                                    val cmd = channel.cmd        // or channel.component2()
-                                    val isSelected = viewModel.selectedChannel?.id == channel.id
-
-                                    // Auto-select first channel or preserve selection
-                                    LaunchedEffect(Unit) {
-                                        if (viewModel.selectedChannel == null) {
-                                            viewModel.selectChannel(channel)
-                                        }
-                                    }
-                                    LaunchedEffect(isSelected) {
-                                        if (isSelected) {
-                                            viewModel.selectDate(
-                                                LocalDate.now().toString()
-                                            )  // Auto-select today's date
-                                            viewModel.loadEpg(
-                                                viewModel.token,
-                                                channel.id,
-                                                viewModel.selectedDate,
-                                                client
-                                            )
-                                        }
-                                    }
-
-                                    ChannelCard(name = name) {
-                                        client.createLink(viewModel.token, cmd) { streamUrl ->
-                                            runOnUiThread {
-                                                playerManager.play(streamUrl)
+                                Row(modifier = Modifier.fillMaxSize()) {
+                                    LazyColumn(
+                                        modifier = Modifier
+                                            .weight(2f)
+                                            .heightIn(max = 200.dp)
+                                            .padding(2.dp)
+                                    ) {
+                                        items(genres) { genre ->
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 1.dp)
+                                                    .clickable {
+                                                        viewModel.selectGenre(if (genre == "All") null else genre)
+                                                    },
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                            ) {
+                                                Box(modifier = Modifier.padding(4.dp)) {
+                                                    Text(genre, style = MaterialTheme.typography.bodyMedium)
+                                                }
                                             }
                                         }
-
                                     }
 
-                                    // Update selection and EPG outside of click
-                                    LaunchedEffect(
-                                        key1 = viewModel.selectedChannel,
-                                        key2 = viewModel.selectedDate
-                                    ) {
-                                        viewModel.selectedChannel?.let { channel ->
-                                            viewModel.loadEpg(
-                                                viewModel.token,
-                                                channel.id,
-                                                viewModel.selectedDate,
-                                                client
-                                            )
-                                        }
-                                    }
-
-                                }
-                            }
-                            val today = LocalDate.now()
-                            val dates = List(9) { today.minusDays(4 - it.toLong()).toString() }
-                            // 📅 Date
-                            LazyColumn(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(max = 452.dp)
-                                    .padding(1.dp)
-                            ) {
-                                items(dates) { date ->
-                                    val displayDate = LocalDate.parse(date)
-                                        .format(DateTimeFormatter.ofPattern("dd.MM"))
-                                    Card(
+                                    LazyColumn(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 2.dp)
-                                            .clickable { viewModel.selectDate(date) },
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                            .focusable()
+                                            .focusRequester(focusRequester)
+                                            .weight(3f)
+                                            .heightIn(max = 452.dp)
+                                            .padding(2.dp)
                                     ) {
-                                        Box(modifier = Modifier.padding(13.dp)) {
-                                            Text(
-                                                displayDate,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
+                                        items(viewModel.filteredChannels) { channel ->
+                                            val name = channel.name
+                                            val cmd = channel.cmd
+                                            val isSelected = viewModel.selectedChannel?.id == channel.id
+
+                                            LaunchedEffect(Unit) {
+                                                if (viewModel.selectedChannel == null) {
+                                                    viewModel.selectChannel(channel)
+                                                }
+                                            }
+                                            LaunchedEffect(isSelected) {
+                                                if (isSelected) {
+                                                    viewModel.selectDate(LocalDate.now().toString())
+                                                    viewModel.loadEpg(viewModel.token, channel.id, viewModel.selectedDate, client)
+                                                }
+                                            }
+
+                                            ChannelCard(name = name) {
+                                                client.createLink(viewModel.token, cmd) { streamUrl ->
+                                                    runOnUiThread {
+                                                        playerManager.play(streamUrl)
+                                                        controlsVisible = false
+                                                    }
+                                                }
+                                            }
+
+                                            LaunchedEffect(
+                                                key1 = viewModel.selectedChannel,
+                                                key2 = viewModel.selectedDate
+                                            ) {
+                                                viewModel.selectedChannel?.let { channel ->
+                                                    viewModel.loadEpg(viewModel.token, channel.id, viewModel.selectedDate, client)
+                                                }
+                                            }
                                         }
                                     }
-                                }
-                            }
 
-
-                            // 🕒 EPG
-                            LazyColumn(
-                                modifier = Modifier
-                                    .weight(7f)
-                                    //.fillMaxHeight()
-                                    .heightIn(max = 450.dp) // or whatever height fits ~10 items
-                                    .padding(2.dp)
-                            ) {
-                                items(viewModel.epgItems) { epg ->
-                                    val (start, end, title) = epg
-                                    Card(
+                                    val today = LocalDate.now()
+                                    val datesList = List(9) { today.minusDays(4 - it.toLong()).toString() }
+                                    LazyColumn(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 2.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                            .weight(1f)
+                                            .heightIn(max = 452.dp)
+                                            .padding(1.dp)
                                     ) {
-                                        Column(modifier = Modifier.padding(8.dp)) {
-                                            Text(
-                                                "$start - $end",
-                                                style = MaterialTheme.typography.labelSmall
-                                            )
-                                            Text(title, style = MaterialTheme.typography.bodyMedium)
+                                        items(datesList) { date ->
+                                            val displayDate = LocalDate.parse(date)
+                                                .format(DateTimeFormatter.ofPattern("dd.MM"))
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 2.dp)
+                                                    .clickable { viewModel.selectDate(date) },
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                            ) {
+                                                Box(modifier = Modifier.padding(13.dp)) {
+                                                    Text(displayDate, style = MaterialTheme.typography.bodyMedium)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    LazyColumn(
+                                        modifier = Modifier
+                                            .weight(7f)
+                                            .heightIn(max = 450.dp)
+                                            .padding(2.dp)
+                                    ) {
+                                        items(viewModel.epgItems) { epg ->
+                                            val (start, end, title) = epg
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 2.dp),
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                            ) {
+                                                Column(modifier = Modifier.padding(8.dp)) {
+                                                    Text("$start - $end", style = MaterialTheme.typography.labelSmall)
+                                                    Text(title, style = MaterialTheme.typography.bodyMedium)
+                                                }
+                                            }
                                         }
                                     }
                                 }
-
                             }
                         }
                     }
                 }
-
             }
 
             client.login(
@@ -229,9 +249,8 @@ class MainActivity : ComponentActivity() {
                     client.getProfile(token) {
                         client.getGenres(token) { genreMap ->
                             runOnUiThread {
-                                viewModel.updateGenres(genreMap) // ← this line populates the genres for UI
+                                viewModel.updateGenres(genreMap)
                             }
-
                             client.getAllChannels(token, genreMap) { list ->
                                 runOnUiThread {
                                     viewModel.updateChannels(list)
@@ -242,11 +261,16 @@ class MainActivity : ComponentActivity() {
                 },
                 onFailure = { error -> println("Login error: $error") }
             )
-
         }
     }
 
-
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+            // toggling Compose state must be done inside setContent scope
+            return false // let Compose handle this via modifier/onKeyEvent if needed
+        }
+        return super.onKeyDown(keyCode, event)
+    }
     @UnstableApi
     private fun playStream(url: String) {
         runOnUiThread {
@@ -268,23 +292,11 @@ class MainActivity : ComponentActivity() {
             player.setMediaSource(mediaSource)
             player.prepare()
             player.play()
-            val playerView = PlayerView(this).apply {
-                useController = true
-                this.player = player
-            }
-
-            player.setMediaSource(mediaSource)
-            player.prepare()
-            player.play()
         }
     }
-
-
 
     override fun onDestroy() {
         super.onDestroy()
         playerManager.release()
     }
-
 }
-
