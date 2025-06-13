@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     topBar = {
                         CenterAlignedTopAppBar(
-                            title = { Text("📺 TeleHub IPTV", style = MaterialTheme.typography.titleLarge) }
+                            title = { Text("📺 TH300 IPTV", style = MaterialTheme.typography.titleLarge) }
                         )
                     }
                 ) { innerPadding ->
