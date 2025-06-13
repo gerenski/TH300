@@ -1,15 +1,22 @@
+# Android Studio/IntelliJ
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+.idea/
+.kotlinc/
+.kotlin/
+
+# Gradle
+.gradle/
+build/
+.cxx/
+.externalNativeBuild/
 local.properties
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Generated captures (e.g. screenshots)
+captures/
+
+# Version catalog lockfile (optional – remove if you want to track it)
+gradle/libs.versions.toml.lockfile

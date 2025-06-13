@@ -52,7 +52,12 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     topBar = {
                         CenterAlignedTopAppBar(
-                            title = { Text("📺 TH300 IPTV", style = MaterialTheme.typography.titleLarge) }
+                            title = {
+                                Text(
+                                    "📺 TH300 IPTV",
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
                         )
                     }
                 ) { innerPadding ->
@@ -71,152 +76,174 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .fillMaxSize()
                         ) {
-                        // 📁 Genres
-                        LazyColumn(
-                            modifier = Modifier
-                                .weight(2f)
-                                //.fillMaxHeight()
-                                .heightIn(max = 200.dp) // or whatever height fits ~10 items
-                                .padding(2.dp)//Space from left side of screen
-                        ) {
-                            items(genres) { genre ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 1.dp)//Space between cards, vertical
-                                        .clickable {
-                                            viewModel.selectGenre(if (genre == "All") null else genre)
-                                        },
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                ) {
-                                    Box(modifier = Modifier.padding(4.dp)) { //Vertical size of cards
-                                        Text(genre, style = MaterialTheme.typography.bodyMedium)
+                            // 📁 Genres
+                            LazyColumn(
+                                modifier = Modifier
+                                    .weight(2f)
+                                    //.fillMaxHeight()
+                                    .heightIn(max = 200.dp) // or whatever height fits ~10 items
+                                    .padding(2.dp)//Space from left side of screen
+                            ) {
+                                items(genres) { genre ->
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 1.dp)//Space between cards, vertical
+                                            .clickable {
+                                                viewModel.selectGenre(if (genre == "All") null else genre)
+                                            },
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Box(modifier = Modifier.padding(4.dp)) { //Vertical size of cards
+                                            Text(genre, style = MaterialTheme.typography.bodyMedium)
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        // 📺 Channels
-                        LazyColumn(
-                            modifier = Modifier
-                                .weight(3f)
-                                //.fillMaxHeight()
-                                .heightIn(max = 452.dp) // or whatever height fits ~10 items
-                                .padding(2.dp)
-                        ) {
-                            items(viewModel.filteredChannels) { channel ->
-                                val name = channel.name        // or channel.component1()
-                                val cmd = channel.cmd        // or channel.component2()
-                                val isSelected = viewModel.selectedChannel?.id == channel.id
+                            // 📺 Channels
+                            LazyColumn(
+                                modifier = Modifier
+                                    .weight(3f)
+                                    //.fillMaxHeight()
+                                    .heightIn(max = 452.dp) // or whatever height fits ~10 items
+                                    .padding(2.dp)
+                            ) {
+                                items(viewModel.filteredChannels) { channel ->
+                                    val name = channel.name        // or channel.component1()
+                                    val cmd = channel.cmd        // or channel.component2()
+                                    val isSelected = viewModel.selectedChannel?.id == channel.id
 
-                                // Auto-select first channel or preserve selection
-                                LaunchedEffect(Unit) {
-                                    if (viewModel.selectedChannel == null) {
-                                        viewModel.selectChannel(channel)
+                                    // Auto-select first channel or preserve selection
+                                    LaunchedEffect(Unit) {
+                                        if (viewModel.selectedChannel == null) {
+                                            viewModel.selectChannel(channel)
+                                        }
                                     }
-                                }
-                                LaunchedEffect(isSelected) {
-                                    if (isSelected) {
-                                        viewModel.selectDate(LocalDate.now().toString())  // Auto-select today's date
-                                        viewModel.loadEpg(viewModel.token, channel.id, viewModel.selectedDate, client)
+                                    LaunchedEffect(isSelected) {
+                                        if (isSelected) {
+                                            viewModel.selectDate(
+                                                LocalDate.now().toString()
+                                            )  // Auto-select today's date
+                                            viewModel.loadEpg(
+                                                viewModel.token,
+                                                channel.id,
+                                                viewModel.selectedDate,
+                                                client
+                                            )
+                                        }
                                     }
-                                }
 
-                                ChannelCard(name = name) {
-                                    client.createLink(viewModel.token, cmd) { streamUrl ->
-                                        runOnUiThread {
-                                            playerManager.play(streamUrl)
+                                    ChannelCard(name = name) {
+                                        client.createLink(viewModel.token, cmd) { streamUrl ->
+                                            runOnUiThread {
+                                                playerManager.play(streamUrl)
+                                            }
+                                        }
+
+                                    }
+
+                                    // Update selection and EPG outside of click
+                                    LaunchedEffect(
+                                        key1 = viewModel.selectedChannel,
+                                        key2 = viewModel.selectedDate
+                                    ) {
+                                        viewModel.selectedChannel?.let { channel ->
+                                            viewModel.loadEpg(
+                                                viewModel.token,
+                                                channel.id,
+                                                viewModel.selectedDate,
+                                                client
+                                            )
                                         }
                                     }
 
                                 }
-
-                                // Update selection and EPG outside of click
-                                LaunchedEffect(key1 = viewModel.selectedChannel, key2 = viewModel.selectedDate) {
-                                    viewModel.selectedChannel?.let { channel ->
-                                        viewModel.loadEpg(viewModel.token, channel.id, viewModel.selectedDate, client)
-                                    }
-                                }
-
                             }
-                        }
-                        val today = LocalDate.now()
-                        val dates = List(9) { today.minusDays(4 - it.toLong()).toString() }
-                        // 📅 Date
-                        LazyColumn(
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(max = 452.dp)
-                                .padding(1.dp)
-                        ) {
-                            items(dates) { date ->
-                                val displayDate = LocalDate.parse(date).format(DateTimeFormatter.ofPattern("dd.MM"))
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 2.dp)
-                                        .clickable { viewModel.selectDate(date) },
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                ) {
-                                    Box(modifier = Modifier.padding(13.dp)) {
-                                        Text(displayDate, style = MaterialTheme.typography.bodyMedium)
-                                    }
-                                }
-                            }
-                        }
-
-
-                        // 🕒 EPG
-                        LazyColumn(
-                            modifier = Modifier
-                                .weight(7f)
-                                //.fillMaxHeight()
-                                .heightIn(max = 450.dp) // or whatever height fits ~10 items
-                                .padding(2.dp)
-                        ) {
-                            items(viewModel.epgItems) { epg ->
-                                val (start, end, title) = epg
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 2.dp),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
-                                        Text("$start - $end", style = MaterialTheme.typography.labelSmall)
-                                        Text(title, style = MaterialTheme.typography.bodyMedium)
+                            val today = LocalDate.now()
+                            val dates = List(9) { today.minusDays(4 - it.toLong()).toString() }
+                            // 📅 Date
+                            LazyColumn(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(max = 452.dp)
+                                    .padding(1.dp)
+                            ) {
+                                items(dates) { date ->
+                                    val displayDate = LocalDate.parse(date)
+                                        .format(DateTimeFormatter.ofPattern("dd.MM"))
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 2.dp)
+                                            .clickable { viewModel.selectDate(date) },
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Box(modifier = Modifier.padding(13.dp)) {
+                                            Text(
+                                                displayDate,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
                                     }
                                 }
                             }
 
+
+                            // 🕒 EPG
+                            LazyColumn(
+                                modifier = Modifier
+                                    .weight(7f)
+                                    //.fillMaxHeight()
+                                    .heightIn(max = 450.dp) // or whatever height fits ~10 items
+                                    .padding(2.dp)
+                            ) {
+                                items(viewModel.epgItems) { epg ->
+                                    val (start, end, title) = epg
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 2.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            Text(
+                                                "$start - $end",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                            Text(title, style = MaterialTheme.typography.bodyMedium)
+                                        }
+                                    }
+                                }
+
+                            }
                         }
                     }
                 }
+
             }
 
-        }
-
-        client.login(
-            onSuccess = { token ->
-                viewModel.updateToken(token)
-                client.getProfile(token) {
-                    client.getGenres(token) { genreMap ->
-                        runOnUiThread {
-                            viewModel.updateGenres(genreMap) // ← this line populates the genres for UI
-                        }
-
-                        client.getAllChannels(token, genreMap) { list ->
+            client.login(
+                onSuccess = { token ->
+                    viewModel.updateToken(token)
+                    client.getProfile(token) {
+                        client.getGenres(token) { genreMap ->
                             runOnUiThread {
-                                viewModel.updateChannels(list)
+                                viewModel.updateGenres(genreMap) // ← this line populates the genres for UI
+                            }
+
+                            client.getAllChannels(token, genreMap) { list ->
+                                runOnUiThread {
+                                    viewModel.updateChannels(list)
+                                }
                             }
                         }
                     }
-                }
-            },
-            onFailure = { error -> println("Login error: $error") }
-        )
+                },
+                onFailure = { error -> println("Login error: $error") }
+            )
 
-
+        }
     }
 
 
@@ -260,4 +287,4 @@ class MainActivity : ComponentActivity() {
     }
 
 }
-}
+
