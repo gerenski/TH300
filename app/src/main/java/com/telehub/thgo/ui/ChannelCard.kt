@@ -1,4 +1,4 @@
-package com.telehub.telehubapp.ui
+package com.telehub.thgo.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box

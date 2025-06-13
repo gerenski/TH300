@@ -1,10 +1,10 @@
-package com.telehub.telehubapp.viewmodels
+package com.telehub.thgo.viewmodels
 
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import java.time.LocalDate
-import com.telehub.telehubapp.network.ApiClient
-import com.telehub.telehubapp.network.ApiClient.Channel
+import com.telehub.thgo.network.ApiClient
+import com.telehub.thgo.network.ApiClient.Channel
 
 class MainViewModel : ViewModel() {
 

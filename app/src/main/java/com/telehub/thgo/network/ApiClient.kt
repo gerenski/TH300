@@ -1,4 +1,4 @@
-package com.telehub.telehubapp.network
+package com.telehub.thgo.network
 
 import okhttp3.*
 import org.json.JSONObject

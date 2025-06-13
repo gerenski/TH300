@@ -1,4 +1,4 @@
-package com.telehub.telehubapp.player
+package com.telehub.thgo.player
 
 import android.content.Context
 import androidx.media3.common.MediaItem

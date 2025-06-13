@@ -1,4 +1,4 @@
-package com.telehub.telehubapp.ui
+package com.telehub.thgo.ui
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -17,10 +17,10 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.compose.foundation.clickable
-import com.telehub.telehubapp.network.ApiClient
-import com.telehub.telehubapp.player.playerManager
+import com.telehub.thgo.network.ApiClient
+import com.telehub.thgo.player.playerManager
 import androidx.activity.viewModels
-import com.telehub.telehubapp.viewmodels.MainViewModel
+import com.telehub.thgo.viewmodels.MainViewModel
 import androidx.media3.common.util.UnstableApi
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
                         CenterAlignedTopAppBar(
                             title = {
                                 Text(
-                                    "📺 TH300 IPTV",
+                                    "📺 THGo IPTV",
                                     style = MaterialTheme.typography.titleLarge
                                 )
                             }

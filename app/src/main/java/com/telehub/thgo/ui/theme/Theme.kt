@@ -1,4 +1,4 @@
-package com.telehub.telehubapp.ui.theme
+package com.telehub.thgo.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable

@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.telehub.telehubapp"
+    namespace = "com.telehub.thgo"
     compileSdk = 35
 
     defaultConfig {

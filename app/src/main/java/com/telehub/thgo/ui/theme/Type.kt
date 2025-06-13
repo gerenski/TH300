@@ -1,4 +1,4 @@
-package com.telehub.telehubapp.ui.theme
+package com.telehub.thgo.ui.theme
 
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
