@@ -38,8 +38,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var playerManager: playerManager
     private lateinit var player: ExoPlayer
     private val mac = "00:1A:79:00:00:01"
-    private val url = "http://test.eurolan.net/stalker_portal/server/load.php"
-    private val referer = "http://test.eurolan.net/stalker_portal/c/"
+    private val url = "http://test.eurolan.net/telehub/server/load.php"
+    private val referer = "http://test.eurolan.net/telehub/c/"
     private val viewModel by viewModels<MainViewModel>()
     // Removed: showControls field is no longer needed
 
